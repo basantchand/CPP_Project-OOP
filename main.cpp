@@ -415,3 +415,42 @@ public:
                    << "/" << ranked.size() << " students)\n";
         std::cout << "==========================================================\n";
     }
+
+        // ---- Menu loop ----
+    void run() {
+        int choice = -1;
+        while (choice != 0) {
+            std::cout << "\n===================================================\n";
+            std::cout << "   STUDENT RECORD MANAGEMENT SYSTEM\n";
+            std::cout << "===================================================\n";
+            std::cout << "1. Enroll Student\n";
+            std::cout << "2. Update Student Record\n";
+            std::cout << "3. Delete Student Record\n";
+            std::cout << "4. Search Student\n";
+            std::cout << "5. List All Students\n";
+            std::cout << "6. Generate Class Report\n";
+            std::cout << "0. Exit\n";
+            choice = readInt("Choose an option: ");
+ 
+            switch (choice) {
+                case 1: enrollStudent(); break;
+                case 2: updateStudent(); break;
+                case 3: deleteStudent(); break;
+                case 4: searchStudent(); break;
+                case 5: listAll(); break;
+                case 6: generateClassReport(); break;
+                case 0: std::cout << "\nAll records saved. Goodbye!\n"; break;
+                default: std::cout << "Invalid option, please try again.\n";
+            }
+        }
+    }
+};
+ 
+// ----------------------------------------------------------------------
+int main() {
+    StudentManagementSystem system;
+    system.run();
+    return 0;
+}
+ 
+
