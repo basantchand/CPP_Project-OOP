@@ -230,3 +230,188 @@ public:
     StudentManagementSystem() : nextRollNumber(1) {
         loadFromFile();
     }
+
+     // ---- Persistence ----
+    void loadFromFile() {
+        std::ifstream file(DATA_FILE);
+        if (!file.is_open()) return; // no existing file yet — start fresh
+ 
+        students.clear();
+        std::string line;
+        int maxRoll = 0;
+        while (std::getline(file, line)) {
+            if (line.empty()) continue;
+            Student s;
+            if (Student::fromFileLine(line, s)) {
+                students.push_back(s);
+                maxRoll = std::max(maxRoll, s.getRollNumber());
+            }
+        }
+        file.close();
+        nextRollNumber = maxRoll + 1;
+    }
+ 
+    void saveToFile() const {
+        std::ofstream file(DATA_FILE, std::ios::trunc);
+        if (!file.is_open()) {
+            std::cout << "Error: could not open " << DATA_FILE << " for writing.\n";
+            return;
+        }
+        for (const auto& s : students) file << s.toFileLine() << "\n";
+        file.close();
+    }
+ 
+    // ---- Core operations ----
+    void enrollStudent() {
+        std::cout << "\n--- Enroll New Student ---\n";
+        std::string name = readLine("Name: ");
+        int age = readInt("Age: ");
+        std::string department = readLine("Department: ");
+ 
+        double marks[NUM_SUBJECTS];
+        std::cout << "Enter marks for each subject:\n";
+        for (int i = 0; i < NUM_SUBJECTS; ++i)
+            marks[i] = readMark(SUBJECT_NAMES[i]);
+ 
+        Student s(nextRollNumber, name, age, department, marks);
+        students.push_back(s);
+        std::cout << "\nStudent enrolled successfully with Roll Number "
+                   << nextRollNumber << ".\n";
+        nextRollNumber++;
+        saveToFile();
+    }
+ 
+    void updateStudent() {
+        std::cout << "\n--- Update Student Record ---\n";
+        int roll = readInt("Enter Roll Number to update: ");
+        Student* s = findByRollNumber(roll);
+        if (!s) {
+            std::cout << "No student found with Roll Number " << roll << ".\n";
+            return;
+        }
+ 
+        std::cout << "Leave a field blank to keep its current value.\n";
+        std::string name = readLine("New Name [" + s->getName() + "]: ");
+        std::string department = readLine("New Department [" + s->getDepartment() + "]: ");
+ 
+        double marks[NUM_SUBJECTS];
+        for (int i = 0; i < NUM_SUBJECTS; ++i) marks[i] = s->getMark(i);
+ 
+        std::cout << "Update marks? (y/n): ";
+        std::string choice;
+        std::getline(std::cin, choice);
+        if (!choice.empty() && (choice[0] == 'y' || choice[0] == 'Y')) {
+            for (int i = 0; i < NUM_SUBJECTS; ++i)
+                marks[i] = readMark(SUBJECT_NAMES[i]);
+        }
+ 
+        int age = s->getAge();
+        *s = Student(roll,
+                      name.empty() ? s->getName() : name,
+                      age,
+                      department.empty() ? s->getDepartment() : department,
+                      marks);
+        std::cout << "Record updated successfully.\n";
+        saveToFile();
+    }
+ 
+    void deleteStudent() {
+        std::cout << "\n--- Delete Student Record ---\n";
+        int roll = readInt("Enter Roll Number to delete: ");
+        auto it = std::remove_if(students.begin(), students.end(),
+            [roll](const Student& s) { return s.getRollNumber() == roll; });
+ 
+        if (it == students.end()) {
+            std::cout << "No student found with Roll Number " << roll << ".\n";
+            return;
+        }
+        students.erase(it, students.end());
+        std::cout << "Student record deleted successfully.\n";
+        saveToFile();
+    }
+ 
+    void searchStudent() {
+        std::cout << "\n--- Search Student ---\n";
+        std::cout << "1. Search by Roll Number\n2. Search by Name\n";
+        int choice = readInt("Choose an option: ");
+ 
+        if (choice == 1) {
+            int roll = readInt("Enter Roll Number: ");
+            Student* s = findByRollNumber(roll);
+            if (s) s->printReportCard();
+            else std::cout << "No student found with Roll Number " << roll << ".\n";
+        } else if (choice == 2) {
+            std::string name = readLine("Enter Name (or part of it): ");
+            std::string lowerName = name;
+            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+            bool found = false;
+            for (const auto& s : students) {
+                std::string sn = s.getName();
+                std::transform(sn.begin(), sn.end(), sn.begin(), ::tolower);
+                if (sn.find(lowerName) != std::string::npos) {
+                    s.printReportCard();
+                    found = true;
+                }
+            }
+            if (!found) std::cout << "No matching student found.\n";
+        } else {
+            std::cout << "Invalid option.\n";
+        }
+    }
+ 
+    void listAll() const {
+        std::cout << "\n--- All Enrolled Students ---\n";
+        if (students.empty()) {
+            std::cout << "No students enrolled yet.\n";
+            return;
+        }
+        std::cout << std::left << std::setw(6) << "Roll" << std::setw(20) << "Name"
+                   << std::setw(16) << "Department" << std::setw(10) << "Total"
+                   << std::setw(10) << "Average" << std::setw(6) << "Grade"
+                   << "Status\n";
+        std::cout << std::string(78, '-') << "\n";
+        for (const auto& s : students) s.printSummaryRow();
+    }
+ 
+    void generateClassReport() const {
+        std::cout << "\n===================== CLASS REPORT =====================\n";
+        if (students.empty()) {
+            std::cout << "No students enrolled yet.\n";
+            return;
+        }
+ 
+        // Rank students by total marks, descending
+        std::vector<Student> ranked = students;
+        std::sort(ranked.begin(), ranked.end(),
+            [](const Student& a, const Student& b) { return a.getTotal() > b.getTotal(); });
+ 
+        std::cout << std::left << std::setw(6) << "Rank" << std::setw(6) << "Roll"
+                   << std::setw(20) << "Name" << std::setw(10) << "Total"
+                   << std::setw(10) << "Average" << std::setw(6) << "Grade"
+                   << "Status\n";
+        std::cout << std::string(78, '-') << "\n";
+ 
+        int rank = 1;
+        double sumAverage = 0.0;
+        int passCount = 0;
+        for (const auto& s : ranked) {
+            std::cout << std::left << std::setw(6) << rank++;
+            s.printSummaryRow();
+            sumAverage += s.getAverage();
+            if (s.isPassing()) passCount++;
+        }
+ 
+        double classAverage = sumAverage / ranked.size();
+        double passRate = (100.0 * passCount) / ranked.size();
+ 
+        std::cout << std::string(78, '-') << "\n";
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << "Class Average   : " << classAverage << "\n";
+        std::cout << "Highest Score   : " << ranked.front().getName()
+                   << " (" << ranked.front().getTotal() << ")\n";
+        std::cout << "Lowest Score    : " << ranked.back().getName()
+                   << " (" << ranked.back().getTotal() << ")\n";
+        std::cout << "Pass Rate       : " << passRate << "% (" << passCount
+                   << "/" << ranked.size() << " students)\n";
+        std::cout << "==========================================================\n";
+    }
